@@ -6,12 +6,13 @@
 #define SEED    0x12345678
 
 typedef struct {
-     uintptr_t * table;
-     int size;
-     int max;
-     uintptr_t deleted;
-     char * (*get_key)(void *);
-     tipoHash tipo; //vamos definir se vai ser simples ou duplo
+    uintptr_t * table;
+    int size;
+    int max;
+    uintptr_t deleted;
+    char * (*get_key)(void *);
+    tipoHash tipo; //vamos definir se vai ser simples ou duplo
+    float limite_ocupação //para definir o limite de ocupação
 }thash;
 
 // criei a segunda função da hash dupla
@@ -45,6 +46,13 @@ int hash_insere(thash * h, void * bucket){
         free(bucket);
         return EXIT_FAILURE; /* hash full*/
     }
+
+    //vamos verificar a taxa de ocupação antes de inserir
+    float taxa = (float)(h->size + 1) / (h->max - 1);
+    if (taxa > h->ocupacao_max) {
+        hash_redimensiona(h);
+    }
+
     do{
         pos = (hash + i * hash2) % h->max;
         if (h->table[pos] == 0 || h->table[pos] == h->deleted){
@@ -71,6 +79,7 @@ int hash_constroi(thash * h,int nbuckets, char * (*get_key)(void *) ){
     h->deleted = (uintptr_t)&(h->size);
     h->get_key = get_key;
     h->tipo = tipo; //adicionamos pra aceitar o tipo da hash
+    h->limite_ocupacao = 0.6; //vou deixar esse valor fixo
     return EXIT_SUCCESS;
 
 }
@@ -132,7 +141,28 @@ void hash_apaga(thash *h){
     free(h->table);
 }
 
+//criei a função de redimensionamento
+int hash_redimensiona(thash * h){
+    int novo_max = (h->max - 1) * 2;
+    thash nova;
+    hash_constroi(&nova, novo_max, h->get_key, h->tipo);
+    nova.ocupacao_max = h->ocupacao_max;
 
+    for(int i = 0; i < h->max; i++){
+        if (h->table[i] != 0 && h->table[i] != h->deleted){
+            void * item = (void *)h->table[i];
+            hash_insere(&nova, item);
+        }
+    }
+
+    //para liberar a tabela antigaa
+    free(h->table);
+
+    //h recebe a nova estrutura
+    *h = nova;
+
+    return EXIT_SUCCESS;
+}
 
 typedef struct{
     char nome[30];
