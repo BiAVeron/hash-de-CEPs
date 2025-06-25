@@ -164,23 +164,76 @@ int hash_redimensiona(thash * h){
     return EXIT_SUCCESS;
 }
 
-typedef struct{
-    char nome[30];
-    char  cpf[11];
-}taluno;
+//criei essa estrutura pro prefixo do cep e apaguei taluno
+typedef struct {
+    char cep[9];     
+    char cidade[50];   
+    char estado[3];    
+} tcep;
 
-char * get_key(void * reg){
-    return (*((taluno *)reg)).nome;
+//usando apenas os 5 digitos do cep como chave
+char * get_cep_prefixo(void * reg){
+    static char prefixo[6]; // 5 + '\0'
+    strncpy(prefixo, ((tcep *)reg)->cep, 5);
+    prefixo[5] = '\0';
+    return prefixo;
+}
+
+//funcao de alocação de item novo
+void * aloca_cep(const char * cep, const char * cidade, const char * estado){
+    tcep * registro = malloc(sizeof(tcep));
+    strcpy(registro->cep, cep);
+    strcpy(registro->cidade, cidade);
+    strcpy(registro->estado, estado);
+    return registro;
+}
+
+void test_ceps(){
+    thash h;
+    hash_constroi(&h, 10, get_cep_prefixo, HASH_SIMPLES);
+    h.ocupacao_max = 0.7;
+
+    hash_insere(&h, aloca_cep("01310-200", "São Paulo", "SP"));
+    hash_insere(&h, aloca_cep("70040-010", "Brasília", "DF"));
+    hash_insere(&h, aloca_cep("30130-000", "Belo Horizonte", "MG"));
+
+    tcep * r = hash_busca(h, "01310");
+    if (r) printf("%s - %s\n", r->cidade, r->estado); // São Paulo - SP
+
+    r = hash_busca(h, "70040");
+    if (r) printf("%s - %s\n", r->cidade, r->estado); // Brasília - DF
+
+    r = hash_busca(h, "30130");
+    if (r) printf("%s - %s\n", r->cidade, r->estado);void test_ceps(){
+    thash h;
+    hash_constroi(&h, 10, get_cep_prefixo, HASH_SIMPLES);
+    h.ocupacao_max = 0.7;
+
+    hash_insere(&h, aloca_cep("01310-200", "São Paulo", "SP"));
+    hash_insere(&h, aloca_cep("70040-010", "Brasília", "DF"));
+    hash_insere(&h, aloca_cep("30130-000", "Belo Horizonte", "MG"));
+
+    tcep * r = hash_busca(h, "01310");
+    if (r) printf("%s - %s\n", r->cidade, r->estado); // sao paulo sp
+
+    r = hash_busca(h, "70040");
+    if (r) printf("%s - %s\n", r->cidade, r->estado); // brasilia df
+
+    r = hash_busca(h, "30130");
+    if (r) printf("%s - %s\n", r->cidade, r->estado); //belo horizonte mg
+
+    r = hash_busca(h, "99999");
+    if (!r) printf("Prefixo não encontrado\n");
+
+    hash_apaga(&h);
 }
 
 
-void * aloca_aluno(char * nome, char * cpf){
-    taluno * aluno = malloc(sizeof(taluno));
-    strcpy(aluno->nome,nome);
-    strcpy(aluno->cpf,cpf);
-    return aluno;
-}
+    r = hash_busca(h, "99999");
+    if (!r) printf("Prefixo não encontrado\n");
 
+    hash_apaga(&h);
+}
 
 
 void test_hash(){
@@ -256,10 +309,10 @@ void test_remove(){
 }
 
 
-
 int main(int argc, char* argv[]){
     test_hash();
     test_search();
     test_remove();
+    test_ceps();
     return 0;
 }
