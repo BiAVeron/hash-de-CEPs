@@ -7,6 +7,7 @@
 #define SEED    0x12345678
 #define ARQUIVO_CEP "ceps.csv" 
 #define TOTAL_BUCKETS_EXP_BUSCA 6100
+#define REPETICOES_PARA_MEDICAO 1000
 #define NUM_BUSCAS_POR_EXPERIMENTO 1000
 #define TOTAL_CEPS_A_CARREGAR 7000 
 
@@ -22,15 +23,14 @@ typedef struct {
     float taxa_max_ocupacao; //para definir o limite de ocupação
 }thash;
 
-// criei a segunda função da hash dupla
-uint32_t hashf2(const char *str){
-    uint32_t h = 0;
-    for (; *str; ++str){
-        h = (h * 33) ^ (unsigned char)(*str);
-    }
-    return (h % 97) + 1;
-}
+//criei essa estrutura pro prefixo do cep e apaguei taluno
+typedef struct {
+    char cep[9];     
+    char cidade[50];   
+    char estado[3];    
+} tcep;
 
+//hash simples
 uint32_t hashf(const char* str, uint32_t h){
     /* One-byte-at-a-time Murmur hash 
     Source: https://github.com/aappleby/smhasher/blob/master/src/Hashes.cpp */
@@ -40,6 +40,15 @@ uint32_t hashf(const char* str, uint32_t h){
         h ^= h >> 15;
     }
     return h;
+}
+
+// criei a segunda função da hash dupla
+uint32_t hashf2(const char *str){
+    uint32_t h = 0;
+    for (; *str; ++str){
+        h = (h * 33) ^ (unsigned char)(*str);
+    }
+    return (h % 97) + 1;
 }
 
 int hash_insere(thash * h, void * bucket);
@@ -78,7 +87,7 @@ int hash_redimensiona(thash * h){
     return EXIT_SUCCESS;
 }
 
-//alterei essa função tbm pra receber os dois tipos, assim como nas funções de inserir e remover
+//alterei essa função tbm pra receber os dois tipos
 int hash_insere(thash * h, void * bucket){
     // verificar se precisa redimensionar
     float taxa_atual = (float)h->size / h->max;
@@ -142,14 +151,6 @@ void hash_apaga(thash *h){
     }
     free(h->table);
 }
-
-
-//criei essa estrutura pro prefixo do cep e apaguei taluno
-typedef struct {
-    char cep[9];     
-    char cidade[50];   
-    char estado[3];    
-} tcep;
 
 //usando apenas os 5 digitos do cep como chave
 char * get_cep_prefixo(void * reg){
@@ -235,10 +236,11 @@ void run_busca_experimento(tipoHash tipo, float ocupacao, tcep** ceps_carregados
     }
 
     // faz as buscas
-    for (int i = 0; i < NUM_BUSCAS_POR_EXPERIMENTO && i < n_inserir; i++) {
-        hash_busca(h, get_cep_prefixo(ceps_carregados[i]));
+    for (int k = 0; k < REPETICOES_PARA_MEDICAO; k++) {
+        for (int i = 0; i < NUM_BUSCAS_POR_EXPERIMENTO && i < n_inserir; i++) {
+            hash_busca(h, get_cep_prefixo(ceps_carregados[i]));
+        }
     }
-    
     free(h.table);
 }
 
@@ -269,37 +271,41 @@ void busca_99_duplo(tcep** ceps, int n) { run_busca_experimento(HASH_DUPLO, 0.99
 
 //parte2 do trabalho: Overhead de inserção
 void insere_6100_inicial() {
-    thash h;
-    hash_constroi(&h, 6100, get_cep_prefixo, HASH_SIMPLES);
-    h.taxa_max_ocupacao = 1.01;
+    for (int i = 0; i < REPETICOES_PARA_MEDICAO; i++) {
+        thash h;
+        hash_constroi(&h, 6100, get_cep_prefixo, HASH_SIMPLES);
+        h.taxa_max_ocupacao = 1.01;
 
-    int n_registros = 0;
-    tcep** registros = carrega_ceps_do_arquivo(ARQUIVO_CEP, &n_registros);
+        int n_registros = 0;
+        tcep** registros = carrega_ceps_do_arquivo(ARQUIVO_CEP, &n_registros);
 
-    for (int i = 0; i < n_registros; i++) {
-        //realocar para a hash poder tomar posse da memória
-        hash_insere(&h, aloca_cep(registros[i]->cep, registros[i]->cidade, registros[i]->estado));
+        for (int i = 0; i < n_registros; i++) {
+            //realocar para a hash poder tomar posse da memória
+            hash_insere(&h, aloca_cep(registros[i]->cep, registros[i]->cidade, registros[i]->estado));
+        }
+
+        libera_ceps_carregados(registros, n_registros);
+        hash_apaga(&h);
     }
-
-    libera_ceps_carregados(registros, n_registros);
-    hash_apaga(&h);
 }
 
 //insere todos os CEPs em uma tabela pequena + redimensionamento
 void insere_1000_inicial() {
-    thash h;
-    hash_constroi(&h, 1000, get_cep_prefixo, HASH_SIMPLES);
-    h.taxa_max_ocupacao = 0.7; //ativa o redimensionamento
+    for (int i = 0; i < REPETICOES_PARA_MEDICAO; i++) {
+        thash h;
+        hash_constroi(&h, 1000, get_cep_prefixo, HASH_SIMPLES);
+        h.taxa_max_ocupacao = 0.7; //ativa o redimensionamento
 
-    int n_registros = 0;
-    tcep** registros = carrega_ceps_do_arquivo(ARQUIVO_CEP, &n_registros);
+        int n_registros = 0;
+        tcep** registros = carrega_ceps_do_arquivo(ARQUIVO_CEP, &n_registros);
 
-    for (int i = 0; i < n_registros; i++) {
-        hash_insere(&h, aloca_cep(registros[i]->cep, registros[i]->cidade, registros[i]->estado));
+        for (int i = 0; i < n_registros; i++) {
+            hash_insere(&h, aloca_cep(registros[i]->cep, registros[i]->cidade, registros[i]->estado));
+        }
+        
+        libera_ceps_carregados(registros, n_registros);
+        hash_apaga(&h);
     }
-    
-    libera_ceps_carregados(registros, n_registros);
-    hash_apaga(&h);
 }
 
 
@@ -308,8 +314,8 @@ void test_ceps(){
     hash_constroi(&h, 10, get_cep_prefixo, HASH_SIMPLES);
     h.taxa_max_ocupacao = 0.7;
 
-    hash_insere(&h, aloca_cep("01310-200", "São Paulo", "SP"));
-    hash_insere(&h, aloca_cep("70040-010", "Brasília", "DF"));
+    hash_insere(&h, aloca_cep("01310-200", "Sao Paulo", "SP"));
+    hash_insere(&h, aloca_cep("70040-010", "Brasilia", "DF"));
     hash_insere(&h, aloca_cep("30130-000", "Belo Horizonte", "MG"));
     hash_insere(&h, aloca_cep("40026-010", "Salvador", "BA"));
     hash_insere(&h, aloca_cep("69005-040", "Manaus", "AM"));
@@ -323,7 +329,7 @@ void test_ceps(){
     if (r) printf("%s - %s\n", r->cidade, r->estado); // São Paulo - SP
 
     r = hash_busca(h, "99999");
-    if (!r) printf("Prefixo não encontrado\n");
+    if (!r) printf("Prefixo nao encontrado\n");
 
     printf("\n");
     hash_apaga(&h);
