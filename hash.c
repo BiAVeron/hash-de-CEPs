@@ -66,10 +66,10 @@ int hash_redimensiona(thash * h){
     int max_antigo = h->max;
     
     // tipo da hash antiga para a nova
-    hash_constroi(&nova_hash, novo_max, h->get_key, h->tipo); 
+    hash_constroi(h, novo_max, h->get_key, h->tipo); 
 
     for(int i = 0; i < max_antigo; i++){
-        if (tabela_antiga[i] != 0 && h->tabela_antiga[i] != h->deleted){
+        if (tabela_antiga[i] != 0 && tabela_antiga[i] != h->deleted){
             hash_insere(h, (void *)tabela_antiga[i]);
         }
     }
@@ -88,7 +88,7 @@ int hash_insere(thash * h, void * bucket){
 
     //tabela no tamanho correto, calculando os hashes
     const char * key = h->get_key(bucket);
-    uint32_t hash = hashf(key, SEED); // Passando a SEEd
+    uint32_t hash_val = hashf(key, SEED); // Passando a SEEd
     uint32_t step = 1;
 
     if (h->tipo == HASH_DUPLO){
@@ -112,7 +112,7 @@ int hash_insere(thash * h, void * bucket){
 
 
 void * hash_busca(thash h, const char * key){
-    uint32_t hash = hashf(key,SEED);
+    uint32_t hash_val = hashf(key,SEED);
     uint32_t step = 1;
 
      if (h.tipo == HASH_DUPLO) {
@@ -137,7 +137,7 @@ void * hash_busca(thash h, const char * key){
 void hash_apaga(thash *h){
     for(int i = 0; i < h->max; i++) {
         if (h->table[i] != 0 && h->table[i] != h->deleted) {
-            free((void *)h->table[pos]);
+            free((void *)h->table[i]);
         }
     }
     free(h->table);
@@ -170,7 +170,7 @@ void * aloca_cep(const char * cep, const char * cidade, const char * estado){
     return registro;
 }
 
-void carrega_ceps(thash *h, const char *nome_arquivo, int max_linhas) {
+tcep** carrega_ceps_do_arquivo(const char *nome_arquivo, int* n_registros) {
     FILE *f = fopen(nome_arquivo, "r");
     
     if (!f) {
@@ -325,7 +325,7 @@ void test_ceps(){
     r = hash_busca(h, "99999");
     if (!r) printf("Prefixo não encontrado\n");
 
-    printf("\n")
+    printf("\n");
     hash_apaga(&h);
 }
 
